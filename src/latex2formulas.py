@@ -32,8 +32,9 @@ PATTERNS = [r"\\begin\{equation\}(.*?)\\end\{equation\}",
 DIR = ""
 
 #Number of bytes required for formula to be saved
-MIN_LENGTH = 40
-MAX_LENGTH = 1024
+MIN_LENGTH = 40 
+MAX_LENGTH = 80
+# MAX_LENGTH = 1024
 
 def get_formulas(latex):
     """ Returns detected latex formulas from given latex string

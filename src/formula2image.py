@@ -41,6 +41,9 @@ import os
 from multiprocessing import Pool
 from subprocess import call
 
+from PIL import Image
+import tqdm
+
 # Max number of formulas included
 MAX_NUMBER = 150*1000
 
@@ -64,6 +67,15 @@ BASIC_SKELETON = r"""
 \end{document}
 """
 
+STANDALONE_SKELETON = r"""
+\documentclass[preview]{standalone}
+\begin{document}
+\begin{displaymath}
+%s
+\end{displaymath}
+\end{document}
+"""
+
 # Different settings used to render images
 # in format key: [skeleton, rendering_call]
 #   - skeleton is the LaTeX code in which formula is inserted 
@@ -73,9 +85,26 @@ BASIC_SKELETON = r"""
 # key/name is used to identify different renderings in dataset file
 
 #RENDERING_SETUPS = {"basic": [BASIC_SKELETON, "./textogif -png -dpi 200 %s"]}
-RENDERING_SETUPS = {"basic": [BASIC_SKELETON, 
-                              "convert -density 200 -quality 100 %s.pdf %s.png"]
+# RENDERING_SETUPS = {"basic": [BASIC_SKELETON, 
+#                               "convert -density 200 -quality 100 %s.pdf %s.png"]
+# IMPORTANT: "-flatten" flag is added so that the png is saved with no alpha channel
+#            alpha channels cause complications with python image libraries
+RENDERING_SETUPS = {"standalone": [STANDALONE_SKELETON, 
+                      "convert -density 200 -quality 100 -flatten %s.pdf %s.png"]
                    }
+
+def recenter_png(name, width=1024, height=128):
+
+    im = Image.open(name)
+
+    # remove all whitespace from edges
+    im = im.crop(im.getbbox())
+
+    # resize to correct size 
+    im = im.resize((width, height))
+
+    # resave the image
+    return im.save(name)
 
 def remove_temp_files(name):
     """ Removes .aux, .log, .pdf and .tex files for name """
@@ -130,7 +159,10 @@ def formula_to_image(formula):
             os.system("rm -rf "+full_path+"*")
             return None
         else: 
+            # Clip and recenter png to desired size 
+            recenter_png("{}.png".format(full_path))
             ret.append([full_path, rend_name])
+
     return ret
     
             
@@ -145,11 +177,11 @@ def main(formula_list):
     # Running a thread pool masks debug output. Uncomment command below to run
     # formulas over images sequentially to see debug errors more clearly
     
-    # names = [formula_to_image(formula) for formula in formulas]
+    # names = [formula_to_image(formula) for formula in tqdm.tqdm(formulas)]
     
     # Also remember to comment threaded version if you use sequential:
     pool = Pool(THREADS)
-    names = list(pool.imap(formula_to_image, formulas))
+    names = pool.imap(formula_to_image, formulas)
     
     zipped = list(zip(formulas, names))
     
